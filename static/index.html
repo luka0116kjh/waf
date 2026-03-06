@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroScan Sentinel | Real-time Web Security</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🛡️</span>
+                <h1>ZeroScan <span>Sentinel</span></h1>
+            </div>
+            <p class="subtitle">실시간 웹사이트 취약점 및 악성 페이로드 분석 엔진</p>
+        </header>
+
+        <section class="search-section">
+            <div class="glass-card search-box">
+                <input type="text" id="urlInput" placeholder="검사할 웹사이트 URL을 입력하세요 (예: https://example.com)" autocomplete="off">
+                <button id="scanBtn">
+                    <span class="btn-text">사이트 정밀 분석</span>
+                    <div class="loader" id="mainLoader"></div>
+                </button>
+            </div>
+        </section>
+
+        <section id="resultSection" class="result-section hidden">
+            <div class="glass-card dashboard">
+                <div class="dashboard-header">
+                    <div class="status-badge" id="statusBadge">Checking...</div>
+                    <div class="url-display" id="urlDisplay"></div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <label>위험 지수 (Risk Score)</label>
+                        <div class="score-container">
+                            <div class="score-ring">
+                                <svg viewBox="0 0 36 36" class="circular-chart">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path id="scorePath" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text id="scoreText" x="18" y="20.35" class="percentage">0%</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item details">
+                        <label>정밀 분석 리포트</label>
+                        <div class="details-content">
+                            <div class="detail-row">
+                                <span class="label">상태:</span>
+                                <span id="resReachable" class="value">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">결과:</span>
+                                <span id="resAllowed" class="value">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">탐지된 패턴:</span>
+                                <span id="resRule" class="value">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">HTTP 상태:</span>
+                                <span id="resStatus" class="value">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert-box" id="alertBox">
+                    <div class="alert-icon" id="alertIcon">ℹ️</div>
+                    <div class="alert-message" id="alertMessage">웹사이트 분석 대기 중...</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="payload-section">
+            <h3>페이로드 직접 분석</h3>
+            <p class="section-desc">URL 대신 의심되는 코드나 텍스트를 직접 입력하여 위험도를 측정합니다.</p>
+            <div class="glass-card payload-box">
+                <textarea id="payloadInput" placeholder="분석할 코드나 텍스트를 입력하세요..."></textarea>
+                <div class="payload-actions">
+                    <button id="inspectBtn" class="secondary-btn">텍스트 즉시 검사</button>
+                    <div id="payloadResult" class="payload-mini-result"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="static/script.js"></script>
+</body>
+</html>

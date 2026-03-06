@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "ZeroScan Sentinel Real-time Guard",
+    "version": "1.0",
+    "description": "실시간으로 접속하는 모든 웹사이트의 위험 요소를 분석하여 보호합니다.",
+    "permissions": [
+        "webNavigation",
+        "tabs",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://*/*",
+        "https://*/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_popup": "popup.html"
+    }
+}
