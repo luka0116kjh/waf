@@ -36,7 +36,7 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
             z-index: 999999; text-align: center; font-weight: bold;
             font-family: sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
           `;
-                    div.innerHTML = `⚠️ ZeroScan 경고: ${msg} (위험 지수: ${Math.round(score * 100)}%) 
+                    div.innerHTML = ` ZeroScan 경고: ${msg} (위험 지수: ${Math.round(score * 100)}%) 
                           <button id="close-waf-alert" style="margin-left: 20px; cursor: pointer;">닫기</button>`;
                     document.body.appendChild(div);
                     document.getElementById('close-waf-alert').onclick = () => div.remove();
