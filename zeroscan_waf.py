@@ -1,8 +1,10 @@
-﻿import html
+import html
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
-from urllib.parse import unquote
+from typing import Dict, List
+from urllib.error import HTTPError, URLError
+from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 
 @dataclass(frozen=True)
@@ -13,6 +15,17 @@ class InspectionResult:
     matched_rule: str = ""
 
 
+@dataclass(frozen=True)
+class WebsiteInspectionResult:
+    url: str
+    reachable: bool
+    allowed: bool
+    alert_message: str
+    risk_score: float
+    matched_rule: str = ""
+    status_code: int = 0
+
+
 class ZeroScanWAF:
     """Hybrid WAF: static regex rules + lightweight anomaly scoring."""
 
@@ -21,29 +34,28 @@ class ZeroScanWAF:
 
         # Stage 1) Attack payload DB (2024-2026 commonly observed families)
         self.payload_blacklist: List[str] = [
-            "' OR 1=1 --",  # SQLi: classic auth bypass
-            "' OR 'a'='a' --",  # SQLi: boolean-based bypass
-            "' UNION SELECT NULL,NULL --",  # SQLi: UNION-based column probing
-            "'/**/UNION/**/SELECT/**/1,2,3--",  # SQLi: comment-obfuscated UNION SELECT
-            "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(0x7e,version(),0x7e,FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--",  # SQLi: MySQL error-based leak
-            "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT DATABASE()),0x7e))--",  # SQLi: XML function error-based leak
-            "' AND UPDATEXML(1,CONCAT(0x7e,user(),0x7e),1)--",  # SQLi: UPDATEXML error-based leak
-            "' AND SLEEP(5)--",  # SQLi: time-based blind probe
-            "' OR IF(1=1,SLEEP(5),0)--",  # SQLi: conditional time-based blind probe
-            "'; WAITFOR DELAY '0:0:5'--",  # SQLi: MSSQL time-based blind probe
-            "<script>alert(1)</script>",  # XSS: basic reflected script execution
-            "\"><svg/onload=alert(1)>",  # XSS: attribute-break + SVG event
-            "javascript:alert(document.domain)",  # XSS: javascript URI execution
-            "<img src=x onerror=alert(1)>",  # XSS: image error-event execution
-            "<details open ontoggle=alert(1)>",  # XSS: HTML5 event handler payload
-            "<svg><script xlink:href=data:,alert(1)></script>",  # XSS: SVG/script polyglot style payload
-            "../../../../etc/passwd",  # LFI: directory traversal to sensitive file
-            "..%2f..%2f..%2f..%2fetc%2fpasswd",  # LFI: URL-encoded traversal
-            "....//....//....//etc/passwd",  # LFI: traversal bypass variant
-            "/proc/self/environ",  # LFI: process environment leakage
+            "' OR 1=1 --",
+            "' OR 'a'='a' --",
+            "' UNION SELECT NULL,NULL --",
+            "'/**/UNION/**/SELECT/**/1,2,3--",
+            "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(0x7e,version(),0x7e,FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--",
+            "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT DATABASE()),0x7e))--",
+            "' AND UPDATEXML(1,CONCAT(0x7e,user(),0x7e),1)--",
+            "' AND SLEEP(5)--",
+            "' OR IF(1=1,SLEEP(5),0)--",
+            "'; WAITFOR DELAY '0:0:5'--",
+            "<script>alert(1)</script>",
+            '\"><svg/onload=alert(1)>',
+            "javascript:alert(document.domain)",
+            "<img src=x onerror=alert(1)>",
+            "<details open ontoggle=alert(1)>",
+            "<svg><script xlink:href=data:,alert(1)></script>",
+            "../../../../etc/passwd",
+            "..%2f..%2f..%2f..%2fetc%2fpasswd",
+            "....//....//....//etc/passwd",
+            "/proc/self/environ",
         ]
 
-        # Stage 2) Regex rules hardened for case changes, comments, spacing, and mild encoding tricks
         # (?is) => case-insensitive + dot matches newline
         self.regex_rules: Dict[str, str] = {
             "SQLI_UNION_SELECT": r"(?is)\bu\W*n\W*i\W*o\W*n\W*(?:/\*.*?\*/|\s|\+|%[0-9a-f]{2})*s\W*e\W*l\W*e\W*c\W*t\b",
@@ -65,13 +77,9 @@ class ZeroScanWAF:
         self.special_chars_pattern = re.compile(r"['\"<>\-\/;()=]", re.IGNORECASE)
 
     def _normalize_input(self, user_input: str) -> str:
-        """Normalize common obfuscation layers before matching."""
         normalized = user_input or ""
-
-        # Decode HTML entities (&lt;, &#x27;, ...)
         normalized = html.unescape(normalized)
 
-        # Decode URL encoding multiple rounds for double-encoding tricks
         for _ in range(2):
             decoded = unquote(normalized)
             if decoded == normalized:
@@ -81,13 +89,6 @@ class ZeroScanWAF:
         return normalized
 
     def calculate_risk_score(self, user_input: str) -> float:
-        """
-        Risk score in [0.0, 1.0].
-        Components:
-        - special character ratio (density)
-        - SQL keyword density
-        - suspicious token bonuses
-        """
         if not user_input:
             return 0.0
 
@@ -95,7 +96,7 @@ class ZeroScanWAF:
         length = max(len(text), 1)
 
         special_count = len(self.special_chars_pattern.findall(text))
-        special_ratio = special_count / length  # 0..1+
+        special_ratio = special_count / length
 
         sql_keywords = self.sql_keywords_pattern.findall(text)
         keyword_density = len(sql_keywords) / max(len(text.split()), 1)
@@ -113,6 +114,15 @@ class ZeroScanWAF:
 
     def inspect(self, user_input: str) -> InspectionResult:
         normalized = self._normalize_input(user_input)
+
+        for payload in self.payload_blacklist:
+            if payload.lower() in normalized.lower():
+                return InspectionResult(
+                    allowed=False,
+                    reason="Payload blacklist matched",
+                    risk_score=1.0,
+                    matched_rule=payload,
+                )
 
         for rule_name, pattern in self.regex_rules.items():
             if re.search(pattern, normalized):
@@ -137,26 +147,92 @@ class ZeroScanWAF:
             risk_score=risk_score,
         )
 
+    def inspect_website(self, url: str, timeout: int = 5) -> WebsiteInspectionResult:
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=False,
+                allowed=False,
+                alert_message="경고: 올바른 http/https 웹사이트 주소가 아닙니다.",
+                risk_score=1.0,
+            )
+
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "ZeroScanWAF/1.0",
+                "Accept": "text/html,application/xhtml+xml",
+            },
+        )
+
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                status_code = getattr(response, "status", 200)
+                content_type = response.headers.get("Content-Type", "")
+                body = response.read(200000).decode("utf-8", errors="ignore")
+        except HTTPError as exc:
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=True,
+                allowed=False,
+                alert_message=f"경고: 웹사이트 응답이 비정상입니다. HTTP {exc.code}",
+                risk_score=0.95,
+                status_code=exc.code,
+            )
+        except URLError as exc:
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=False,
+                allowed=False,
+                alert_message=f"경고: 웹사이트에 접속할 수 없습니다. {exc.reason}",
+                risk_score=1.0,
+            )
+        except Exception as exc:
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=False,
+                allowed=False,
+                alert_message=f"경고: 검사 중 오류가 발생했습니다. {exc}",
+                risk_score=1.0,
+            )
+
+        combined_text = "\n".join([url, content_type, body])
+        inspection = self.inspect(combined_text)
+
+        if not inspection.allowed:
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=True,
+                allowed=False,
+                alert_message="경고: 위험 징후가 감지된 웹사이트입니다.",
+                risk_score=inspection.risk_score,
+                matched_rule=inspection.matched_rule,
+                status_code=status_code,
+            )
+
+        return WebsiteInspectionResult(
+            url=url,
+            reachable=True,
+            allowed=True,
+            alert_message="정상: 현재 확인된 위험 징후가 없습니다.",
+            risk_score=inspection.risk_score,
+            status_code=status_code,
+        )
+
 
 if __name__ == "__main__":
     waf = ZeroScanWAF(risk_threshold=0.8)
-
-    test_inputs = [
-        "union/**/select 1,2,3",
-        "'; DROP TABLE users; --",
-        "<img src=x onerror=alert(1)>",
-        "../../../../etc/passwd",
-        "hello world",
-    ]
-
-    for item in test_inputs:
-        result = waf.inspect(item)
-        print(
-            {
-                "input": item,
-                "allowed": result.allowed,
-                "reason": result.reason,
-                "matched_rule": result.matched_rule,
-                "risk_score": round(result.risk_score, 3),
-            }
-        )
+    target_url = input("검사할 웹사이트 주소를 입력하세요: ").strip()
+    result = waf.inspect_website(target_url)
+    print(
+        {
+            "url": result.url,
+            "reachable": result.reachable,
+            "allowed": result.allowed,
+            "alert_message": result.alert_message,
+            "matched_rule": result.matched_rule,
+            "status_code": result.status_code,
+            "risk_score": round(result.risk_score, 3),
+        }
+    )
