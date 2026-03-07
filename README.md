@@ -1,125 +1,113 @@
 ﻿# ZeroScan Sentinel
 
-ZeroScan Sentinel은 FastAPI 기반의 간단한 WAF 분석 서버와 Chrome 확장 프로그램을 결합한 실시간 웹 위험 감지 프로젝트입니다.
+[English](README.md) | [한국어](README_KR.md)
 
-기본 동작은 `알림 모드`이며, 위험 징후가 감지되면 현재 페이지 상단에 경고 배너를 표시합니다. 필요하면 확장 프로그램 팝업에서 `차단 모드`로 전환해 위험 사이트를 전용 차단 페이지로 넘길 수 있습니다.
+ZeroScan Sentinel is a real-time web threat detection project that combines a FastAPI-based WAF (Web Application Firewall) analysis server with a Chrome extension.
 
-## 주요 기능
+The extension operates in `Alert Mode` by default, displaying a warning banner at the top of the page when a threat is detected. If necessary, you can switch to `Block Mode` via the extension popup to redirect malicious sites to a dedicated blocking page.
 
-- 실시간 URL 검사
-  - Chrome 확장 프로그램이 메인 프레임 이동을 감지하고 로컬 WAF API에 URL 검사를 요청합니다.
-- 알림 모드
-  - 기본값입니다. 위험 사이트로 판단되면 현재 페이지 상단에 경고 배너를 표시합니다.
-- 차단 모드
-  - 위험 사이트로 판단되면 확장 프로그램 내부 차단 페이지로 이동시킵니다.
-- 예외 허용
-  - 차단 페이지에서 `이번만 계속 접속` 또는 `이 도메인 항상 허용`을 선택할 수 있습니다.
-- 직접 페이로드 검사
-  - 대시보드 UI에서 URL 또는 텍스트 페이로드를 직접 검사할 수 있습니다.
-- 하이브리드 탐지
-  - 정적 패턴 매칭과 간단한 위험 점수 계산을 함께 사용합니다.
+## Key Features
 
-## 빠른 시작
+- **Real-time URL Inspection**: The Chrome extension monitors main frame navigation and requests URL scans from the local WAF API.
+- **Alert Mode**: (Default) Displays a warning banner on the page when a threat is detected.
+- **Block Mode**: Redirects the user to an internal blocking page when a threat is detected.
+- **Whitelisting**: In `Block Mode`, users can choose "Continue once" or "Always allow this domain."
+- **Direct Payload Inspection**: Test URLs or text payloads directly through the web dashboard UI.
+- **Hybrid Detection**: Combines static pattern matching with a lightweight risk scoring system.
 
-### 1. Python 패키지 설치
+## Quick Start
+
+### 1. Install Python Packages
 
 ```powershell
 pip install fastapi uvicorn
 ```
 
-### 2. API 서버 실행
+### 2. Run API Server
 
 ```powershell
 python app.py
 ```
 
-서버는 기본적으로 `http://127.0.0.1:8000`에서 실행됩니다.
+The server runs at `http://127.0.0.1:8000` by default.
 
-### 3. Chrome 확장 프로그램 로드
+### 3. Load Chrome Extension
 
-1. Chrome에서 `chrome://extensions/`로 이동합니다.
-2. 오른쪽 상단의 `개발자 모드`를 켭니다.
-3. `압축해제된 확장 프로그램을 로드합니다`를 클릭합니다.
-4. 이 프로젝트의 `extension` 폴더를 선택합니다.
+1. Go to `chrome://extensions/` in Chrome.
+2. Enable **Developer mode** in the top right corner.
+3. Click **Load unpacked**.
+4. Select the `extension` folder of this project.
 
-확장 프로그램은 `http://127.0.0.1:8000/api/scan`에 연결됩니다.
-즉, 평소에는 `python app.py`만 실행되어 있으면 확장 프로그램이 자동으로 동작합니다.
+The extension connects to `http://127.0.0.1:8000/api/scan`. Ensure `python app.py` is running for the extension to work.
+After modifying the extension code, click the **refresh icon** on the extension card.
 
-코드를 수정한 뒤에는 확장 프로그램 카드에서 `새로고침`을 눌러 반영합니다.
+## Usage
 
-## 사용 방법
+### Web Dashboard
 
-### 웹 대시보드
+- Access `http://127.0.0.1:8000` in your browser.
+- Enter a URL to analyze.
+- Or paste text/payloads directly to inspect.
 
-- 브라우저에서 `http://127.0.0.1:8000` 접속
-- 검사할 URL 입력 후 분석
-- 또는 텍스트/페이로드를 직접 입력해 검사
+### Extension
 
-### 확장 프로그램
+- Default is **Alert Mode**.
+- Toggle to **Block Mode** in the popup.
+- In Block Mode, accessing a risky page redirects to the block page.
+- Decisions on the block page:
+  - `Continue this time`
+  - `Always allow this domain`
+  - `Go to previous page`
+  - `Close tab`
 
-- 기본값은 `알림 모드`
-- 팝업에서 `차단 모드`로 전환 가능
-- 차단 모드에서 위험 페이지 접근 시 차단 페이지로 이동
-- 차단 페이지에서 다음 중 하나 선택 가능
-  - `이번만 계속 접속`
-  - `이 도메인 항상 허용`
-  - `이전 페이지로 돌아가기`
-  - `탭 닫기`
+## Recommended Testing Procedure
 
-## 권장 테스트 절차
+1. Run `python app.py` in your terminal.
+2. Verify access to `http://127.0.0.1:8000`.
+3. Ensure the extension is loaded in `chrome://extensions/`.
+4. Refresh the extension if needed.
+5. Visit a test URL and check for alert or block behavior.
 
-1. 터미널에서 `python app.py` 실행
-2. 브라우저에서 `http://127.0.0.1:8000` 접속 확인
-3. `chrome://extensions/`에서 확장 프로그램이 로드되어 있는지 확인
-4. 필요하면 확장 프로그램 `새로고침`
-5. 테스트 URL 접속 후 알림 또는 차단 동작 확인
+## How It Works
 
-## 동작 방식
+### Backend
 
-### 백엔드
+- **`app.py`**: Executes the FastAPI server.
+  - `/api/scan`: Inspects a website URL.
+  - `/api/inspect`: Inspects a text payload.
+- **`zeroscan_waf.py`**:
+  - Checks for SQLi, XSS, and LFI patterns.
+  - Performs URL validation.
+  - Detects high-risk active patterns in web responses.
 
-- `app.py`
-  - FastAPI 서버를 실행합니다.
-  - `/api/scan`: 웹사이트 URL 검사
-  - `/api/inspect`: 텍스트 페이로드 검사
-- `zeroscan_waf.py`
-  - SQLi, XSS, LFI 관련 패턴 검사
-  - URL 자체 검사
-  - 웹 응답에서 고위험 능동형 패턴 탐지
-
-### 프런트엔드
+### Frontend
 
 - `static/index.html`
 - `static/script.js`
 - `static/style.css`
 
-브라우저에서 직접 URL과 페이로드를 넣어 검사 결과를 확인하는 대시보드입니다.
+A dashboard where you can manually test URLs and payloads.
 
-### Chrome 확장 프로그램
+### Chrome Extension
 
-- `extension/background.js`
-  - 페이지 이동 감시, 알림/차단 처리, 예외 허용 처리
-- `extension/popup.html`
-- `extension/popup.js`
-  - 알림 모드 / 차단 모드 전환
-- `extension/blocked.html`
-- `extension/blocked.js`
-  - 차단 페이지, 이번만 허용, 도메인 허용
+- **`extension/background.js`**: Monitors page navigation, handles alerts/blocking, and manages whitelists.
+- **`extension/popup.html` / `popup.js`**: UI to switch between Alert and Block modes.
+- **`extension/blocked.html` / `blocked.js`**: Redirection page for Block Mode.
 
-## 현재 제한 사항
+## Current Limitations
 
-- `/api/scan`은 서버가 직접 URL에 접속하는 구조라 SSRF 방어가 아직 충분하지 않습니다.
-- 탐지 정확도는 데모 수준이며, 오탐과 미탐이 남아 있을 수 있습니다.
-- 일부 기존 파일은 인코딩이 깨져 있을 수 있습니다.
-- 로컬 API 서버가 실행 중이어야 확장 프로그램이 정상 동작합니다.
+- `/api/scan` structure is vulnerable to SSRF as the server visits the URL directly.
+- Detection accuracy is at a demo level; false positives and false negatives may occur.
+- Local API server must be running for the extension to function.
 
-## 프로젝트 구조
+## Project Structure
 
 ```text
 waf/
 |-- app.py
 |-- zeroscan_waf.py
 |-- README.md
+|-- README_KR.md
 |-- static/
 |   |-- index.html
 |   |-- script.js
@@ -133,6 +121,6 @@ waf/
     `-- popup.js
 ```
 
-## 참고
+## Disclaimer
 
-이 프로젝트는 학습 및 프로토타이핑 목적의 보안 감지 도구입니다. 실제 운영 환경에 적용하려면 SSRF 방어, 정밀한 정책 설계, 로그 관리, 예외 정책 관리, 탐지 정확도 개선이 추가로 필요합니다.
+This project is a security detection tool for educational and prototyping purposes. For production use, additional features such as SSRF protection, precise policy design, log management, and improved detection accuracy are required.
