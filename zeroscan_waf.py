@@ -1,4 +1,4 @@
-import html
+﻿import html
 import re
 from dataclasses import dataclass
 from typing import Dict, List
@@ -32,7 +32,6 @@ class ZeroScanWAF:
     def __init__(self, risk_threshold: float = 0.8) -> None:
         self.risk_threshold = risk_threshold
 
-        # Stage 1) Attack payload DB (2024-2026 commonly observed families)
         self.payload_blacklist: List[str] = [
             "' OR 1=1 --",
             "' OR 'a'='a' --",
@@ -56,7 +55,6 @@ class ZeroScanWAF:
             "/proc/self/environ",
         ]
 
-        # (?is) => case-insensitive + dot matches newline
         self.regex_rules: Dict[str, str] = {
             "SQLI_UNION_SELECT": r"(?is)\bu\W*n\W*i\W*o\W*n\W*(?:/\*.*?\*/|\s|\+|%[0-9a-f]{2})*s\W*e\W*l\W*e\W*c\W*t\b",
             "SQLI_STACKED_OR_DANGEROUS": r"(?is)(?:;\s*(?:drop|alter|truncate|create)\b)|(?:\b(?:or|and)\b\s+\d+\s*=\s*\d+)",
@@ -68,6 +66,15 @@ class ZeroScanWAF:
             "XSS_POLYGLOT_HINT": r"(?is)(?:<svg\b|<math\b|xlink:href|data\s*:\s*text/html)",
             "LFI_TRAVERSAL": r"(?is)(?:\.\./|\.\.\\|%2e%2e%2f|%2e%2e\\)+",
             "LFI_SENSITIVE_FILES": r"(?is)(?:/etc/passwd|/proc/self/environ|/windows/win\.ini)",
+        }
+
+        self.website_signal_rules: Dict[str, str] = {
+            "INLINE_SCRIPT_ALERT": r"(?is)<script\b[^>]*>[^<]{0,256}(?:alert|prompt|confirm)\s*\(",
+            "EVENT_HANDLER_PAYLOAD": r"(?is)on(?:error|load|mouseover|focus)\s*=\s*['\"][^\"']{0,256}(?:alert|eval|document\.cookie|fromCharCode)",
+            "JAVASCRIPT_URI_PAYLOAD": r"(?is)javascript\s*:\s*(?:alert|eval|fetch|document\.cookie|location)",
+            "DATA_URI_SCRIPT": r"(?is)data\s*:\s*text/html[^,]{0,128},[^>]{0,512}(?:<script|javascript:|onerror=)",
+            "COOKIE_EXFIL_PATTERN": r"(?is)(?:document\.cookie|localStorage\.getItem|sessionStorage\.getItem).{0,120}(?:fetch\(|XMLHttpRequest|navigator\.sendBeacon)",
+            "TRAVERSAL_REFERENCE": r"(?is)(?:%2e%2e%2f|\.\./|/etc/passwd|/proc/self/environ)",
         }
 
         self.sql_keywords_pattern = re.compile(
@@ -147,6 +154,20 @@ class ZeroScanWAF:
             risk_score=risk_score,
         )
 
+    def _collect_website_signals(self, url: str, content_type: str, body: str) -> List[str]:
+        normalized_body = self._normalize_input(body[:50000])
+        if "html" not in content_type.lower() and "svg" not in content_type.lower():
+            normalized_body = ""
+
+        analysis_text = "\n".join([url, content_type, normalized_body])
+        matches: List[str] = []
+
+        for rule_name, pattern in self.website_signal_rules.items():
+            if re.search(pattern, analysis_text):
+                matches.append(rule_name)
+
+        return matches
+
     def inspect_website(self, url: str, timeout: int = 5) -> WebsiteInspectionResult:
         parsed = urlparse(url.strip())
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -154,7 +175,7 @@ class ZeroScanWAF:
                 url=url,
                 reachable=False,
                 allowed=False,
-                alert_message="경고: 올바른 http/https 웹사이트 주소가 아닙니다.",
+                alert_message="Invalid URL. Only http/https URLs are supported.",
                 risk_score=1.0,
             )
 
@@ -175,55 +196,68 @@ class ZeroScanWAF:
             return WebsiteInspectionResult(
                 url=url,
                 reachable=True,
-                allowed=False,
-                alert_message=f"경고: 웹사이트 응답이 비정상입니다. HTTP {exc.code}",
-                risk_score=0.95,
+                allowed=True,
+                alert_message=f"Site returned HTTP {exc.code}; deep inspection skipped.",
+                risk_score=0.1,
                 status_code=exc.code,
             )
         except URLError as exc:
             return WebsiteInspectionResult(
                 url=url,
                 reachable=False,
-                allowed=False,
-                alert_message=f"경고: 웹사이트에 접속할 수 없습니다. {exc.reason}",
-                risk_score=1.0,
+                allowed=True,
+                alert_message=f"Could not connect to the site: {exc.reason}",
+                risk_score=0.0,
             )
         except Exception as exc:
             return WebsiteInspectionResult(
                 url=url,
                 reachable=False,
-                allowed=False,
-                alert_message=f"경고: 검사 중 오류가 발생했습니다. {exc}",
-                risk_score=1.0,
+                allowed=True,
+                alert_message=f"Inspection error: {exc}",
+                risk_score=0.0,
             )
 
-        combined_text = "\n".join([url, content_type, body])
-        inspection = self.inspect(combined_text)
-
-        if not inspection.allowed:
+        url_inspection = self.inspect(url)
+        if not url_inspection.allowed:
             return WebsiteInspectionResult(
                 url=url,
                 reachable=True,
                 allowed=False,
-                alert_message="경고: 위험 징후가 감지된 웹사이트입니다.",
-                risk_score=inspection.risk_score,
-                matched_rule=inspection.matched_rule,
+                alert_message="The URL itself matches a high-risk attack pattern.",
+                risk_score=url_inspection.risk_score,
+                matched_rule=url_inspection.matched_rule,
                 status_code=status_code,
             )
 
+        website_signals = self._collect_website_signals(url, content_type, body)
+        if website_signals:
+            risk_score = min(1.0, 0.55 + (0.15 * len(website_signals)))
+            return WebsiteInspectionResult(
+                url=url,
+                reachable=True,
+                allowed=False,
+                alert_message="Suspicious active content was detected in the page response.",
+                risk_score=risk_score,
+                matched_rule=website_signals[0],
+                status_code=status_code,
+            )
+
+        signal_text = "\n".join([url, content_type])
+        risk_score = max(url_inspection.risk_score, self.calculate_risk_score(signal_text))
         return WebsiteInspectionResult(
             url=url,
             reachable=True,
             allowed=True,
-            alert_message="정상: 현재 확인된 위험 징후가 없습니다.",
-            risk_score=inspection.risk_score,
+            alert_message="No high-confidence threat indicators were detected.",
+            risk_score=risk_score,
             status_code=status_code,
         )
 
 
 if __name__ == "__main__":
     waf = ZeroScanWAF(risk_threshold=0.8)
-    target_url = input("검사할 웹사이트 주소를 입력하세요: ").strip()
+    target_url = input("Enter a URL to inspect: ").strip()
     result = waf.inspect_website(target_url)
     print(
         {

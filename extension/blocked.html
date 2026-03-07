@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroScan Sentinel | Blocked</title>
+    <style>
+        :root {
+            --panel: rgba(34, 18, 18, 0.92);
+            --line: rgba(255, 255, 255, 0.12);
+            --text: #f5f5f4;
+            --muted: #d6d3d1;
+            --danger: #ef4444;
+            --danger-soft: #fca5a5;
+            --ghost: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(239, 68, 68, 0.18), transparent 32%),
+                radial-gradient(circle at bottom right, rgba(251, 113, 133, 0.18), transparent 24%),
+                linear-gradient(135deg, #170f0f 0%, #090909 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .panel {
+            width: min(820px, 100%);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(18px);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(239, 68, 68, 0.16);
+            color: var(--danger-soft);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 18px 0 12px;
+            font-size: clamp(32px, 5vw, 52px);
+            line-height: 1;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-top: 24px;
+        }
+
+        .card {
+            padding: 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--danger-soft);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .value {
+            word-break: break-word;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .score {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--danger);
+            line-height: 1;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 14px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: var(--danger);
+            color: white;
+        }
+
+        .secondary {
+            background: var(--ghost);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+        }
+
+        .feedback {
+            min-height: 20px;
+            margin-top: 16px;
+            color: var(--danger-soft);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <main class="panel">
+        <div class="eyebrow">ZeroScan Sentinel</div>
+        <h1>위험 가능성이 높은 사이트를 차단했습니다.</h1>
+        <p>현재 확장 프로그램이 차단 모드로 동작 중입니다. 오탐이라고 판단되면 일회성 예외 또는 도메인 허용을 선택할 수 있습니다.</p>
+
+        <section class="grid">
+            <article class="card">
+                <span class="label">Blocked URL</span>
+                <div class="value" id="blockedUrl">-</div>
+            </article>
+            <article class="card">
+                <span class="label">Risk Score</span>
+                <div class="score" id="riskScore">0%</div>
+            </article>
+            <article class="card">
+                <span class="label">Matched Rule</span>
+                <div class="value" id="matchedRule">-</div>
+            </article>
+            <article class="card">
+                <span class="label">HTTP Status</span>
+                <div class="value" id="statusCode">-</div>
+            </article>
+        </section>
+
+        <section class="card" style="margin-top: 14px;">
+            <span class="label">Reason</span>
+            <div class="value" id="message">-</div>
+        </section>
+
+        <div class="actions">
+            <button class="primary" id="continueBtn">이번만 계속 접속</button>
+            <button class="secondary" id="allowDomainBtn">이 도메인 항상 허용</button>
+            <button class="secondary" id="goBackBtn">이전 페이지로 돌아가기</button>
+            <button class="secondary" id="closeTabBtn">탭 닫기</button>
+        </div>
+
+        <div class="feedback" id="feedback"></div>
+    </main>
+
+    <script src="blocked.js"></script>
+</body>
+</html>
