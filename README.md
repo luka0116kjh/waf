@@ -1,4 +1,4 @@
-﻿# ZeroScan Sentinel
+﻿# ZeroScan WAF
 
 [![English](https://img.shields.io/badge/lang-English-blue?style=flat-square)](README.md)
 [![Korean](https://img.shields.io/badge/lang-한국어-red?style=flat-square)](README_KR.md)
