@@ -1,6 +1,7 @@
 # ZeroScan Sentinel
 
-[English](README.md) | [한국어](README_KR.md)
+[![English](https://img.shields.io/badge/lang-English-blue?style=flat-square)](README.md)
+[![Korean](https://img.shields.io/badge/lang-한국어-red?style=flat-square)](README.ko.md)
 
 ZeroScan Sentinel은 FastAPI 기반의 간단한 WAF 분석 서버와 Chrome 확장 프로그램을 결합한 실시간 웹 위험 감지 프로젝트입니다.
 
