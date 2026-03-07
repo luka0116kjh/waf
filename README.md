@@ -1,7 +1,7 @@
 ﻿# ZeroScan Sentinel
 
 [![English](https://img.shields.io/badge/lang-English-blue?style=flat-square)](README.md)
-[![Korean](https://img.shields.io/badge/lang-한국어-red?style=flat-square)](README.ko.md)
+[![Korean](https://img.shields.io/badge/lang-한국어-red?style=flat-square)](README_KR.md)
 
 ZeroScan Sentinel is a real-time web threat detection project that combines a FastAPI-based WAF (Web Application Firewall) analysis server with a Chrome extension.
 
